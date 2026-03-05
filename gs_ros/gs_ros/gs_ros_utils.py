@@ -155,7 +155,7 @@ def make_gs_scene(scene_config):
             floor_height=scene_config.get("tool_config", {}).get("floor_height", 0),
         ),
         rigid_options=make_rigid_options(scene_config.get("rigid_config", None)),
-        avatar_options=make_avatar_options(scene_config.get("avatar_config", None)),
+        #avatar_options=make_avatar_options(scene_config.get("avatar_config", None)),
         mpm_options=make_mpm_options(scene_config.get("mpm_config", None)),
         sph_options=make_sph_options(scene_config.get("sph_config", None)),
         fem_options=make_fem_options(scene_config.get("fem_config", None)),
@@ -361,7 +361,7 @@ def make_viewer_options(viewer_config):
         camera_lookat=viewer_config.get("camera_lookat", (0.0, 0.0, 0.5)),
         camera_up=viewer_config.get("camera_up", (0.0, 0.0, 1.0)),
         camera_fov=viewer_config.get("camera_fov", 40),
-        enable_interaction=viewer_config.get("enable_interaction", False),
+        #enable_interaction=viewer_config.get("enable_interaction", False),
     )
     return viewer_options
 
