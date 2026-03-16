@@ -64,60 +64,71 @@ def generate_launch_description():
         namespace=namespace,
     )
 
+    ros2_control_node = Node(
+        package="controller_manager",
+        executable="ros2_control_node",
+        parameters=[robot_controllers],
+        output="screen",
+        namespace=namespace,
+    )
+
     joint_state_broadcaster_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
             "joint_state_broadcaster",
-            "--param-file",
-            robot_controllers,
+            "--controller-manager", "/robot/controller_manager",
+            "--param-file", robot_controllers,
         ],
         namespace=namespace,
+        output="screen"
     )
     diff_drive_base_controller_spawner = Node(
         package="controller_manager",
         executable="spawner",
         arguments=[
             "diff_drive_base_controller",
-            "--param-file",
-            robot_controllers,
+            "--controller-manager", "/robot/controller_manager",
+            "--param-file", robot_controllers,
         ],
         namespace=namespace,
         # remappings=[('/robot/diff_drive_base_controller/cmd_vel_unstamped','/cmd_vel')]
+        output="screen"
     )
-    ros2_control_node = Node(
-        package="controller_manager",
-        executable="ros2_control_node",
-        parameters=[robot_controllers],
-        remappings=[
-            (
-                "/robot/controller_manager/robot_description",
-                f"/robot/robot_description",
-            ),
-        ],
-        output="screen",
-        namespace=namespace,
-    )
+    #ros2_control_node = Node(
+    #    package="controller_manager",
+    #    executable="ros2_control_node",
+    #    parameters=[robot_controllers],
+    #    remappings=[
+    #        (
+    #            "/robot/controller_manager/robot_description",
+    #            f"/robot/robot_description",
+    #        ),
+    #    ],
+    #    output="screen",
+    #    namespace=namespace,
+    #)
 
     return LaunchDescription(
         [
-            joint_state_broadcaster_spawner,
-            RegisterEventHandler(
-                event_handler=OnProcessExit(
-                    target_action=joint_state_broadcaster_spawner,
-                    on_exit=[diff_drive_base_controller_spawner],
-                )
-            ),
-            node_robot_state_publisher,
-            ros2_control_node,
-            # Launch Arguments
             DeclareLaunchArgument(
                 "use_sim_time",
                 default_value=use_sim_time,
                 description="If true, use simulated clock",
             ),
             DeclareLaunchArgument(
-                "namespace", default_value=namespace, description="Namespace to be used"
+                "namespace",
+                default_value=namespace,
+                description="Namespace to be used",
+            ),
+            node_robot_state_publisher,
+            ros2_control_node,
+            joint_state_broadcaster_spawner,
+            RegisterEventHandler(
+                event_handler=OnProcessExit(
+                    target_action=joint_state_broadcaster_spawner,
+                    on_exit=[diff_drive_base_controller_spawner],
+                )
             ),
         ]
     )

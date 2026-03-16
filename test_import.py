@@ -15,7 +15,7 @@ def main(args=None):
     # if the default_ros_node is used for everything you may experience bottlenecks
     gs_ros_bridge = GsRosBridge(
         default_ros_node,
-        "src/configs/panda_demo.yaml",
+        "configs/diff_demo.yaml",
         add_debug_objects=False,
         enable_simulation_interfaces=True,
     )
