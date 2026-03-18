@@ -67,7 +67,13 @@ def generate_launch_description():
     ros2_control_node = Node(
         package="controller_manager",
         executable="ros2_control_node",
-        parameters=[robot_controllers],
+        parameters=[robot_description, robot_controllers],
+        remappings=[
+            (
+                "/robot/controller_manager/robot_description",
+                f"/robot/robot_description",
+            ),
+        ],
         output="screen",
         namespace=namespace,
     )
@@ -94,6 +100,18 @@ def generate_launch_description():
         namespace=namespace,
         # remappings=[('/robot/diff_drive_base_controller/cmd_vel_unstamped','/cmd_vel')]
         output="screen"
+    )
+
+    forward_velocity_controller_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=[
+            "forward_velocity_controller",
+            "--controller-manager", "/robot/controller_manager",
+            "--param-file", robot_controllers,
+        ],
+        namespace=namespace,
+        output="screen",
     )
     #ros2_control_node = Node(
     #    package="controller_manager",

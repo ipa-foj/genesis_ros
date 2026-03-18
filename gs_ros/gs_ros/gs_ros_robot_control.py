@@ -5,6 +5,7 @@ from .gs_ros_utils import get_current_timestamp, get_joint_names, get_dofs_idx
 
 import genesis as gs
 
+import math
 
 class GsRosRobotControl:
     """Manages robot joint states and control commands via ROS 2 topics."""
@@ -164,26 +165,44 @@ class GsRosRobotControl:
         pos_vals, pos_dofs = [], []
         vel_vals, vel_dofs = [], []
         eff_vals, eff_dofs = [], []
+
         for joint, joint_cfg in joint_properties.items():
-            if joint_cfg.get("command", "").lower() == "position":
-                pos_vals.append(point.position[pos_i])
-                pos_dofs.append(dof_idx_table[joint])
+            cmd = joint_cfg.get("command", "").lower()
+
+            if cmd == "position":
+                val = point.position[pos_i]
                 pos_i += 1
-            elif joint_cfg.get("command", "").lower() == "velocity":
-                vel_vals.append(point.velocity[vel_i])
-                vel_dofs.append(dof_idx_table[joint])
+            elif cmd == "velocity":
+                val = point.velocity[vel_i]
                 vel_i += 1
-            elif joint_cfg.get("command", "").lower() == "effort":
-                eff_vals.append(msg.effort[eff_i])
-                eff_dofs.append(dof_idx_table[joint])
+            elif cmd == "effort":
+                val = point.effort[eff_i]
                 eff_i += 1
             else:
-                gs.logger.error(f"Invalid joint command type for {joint} joint")
+                gs.logger.debug(f"Invalid joint command type for {joint} joint")
                 valid = False
+                continue
+
+            # check for NaN or inf
+            if not math.isfinite(val):
+                gs.logger.debug(f"Invalid value (NaN/inf) for joint {joint}: {val}")
+                valid = False
+                continue
+
+            if cmd == "position":
+                pos_vals.append(val)
+                pos_dofs.append(dof_idx_table[joint])
+            elif cmd == "velocity":
+                vel_vals.append(val)
+                vel_dofs.append(dof_idx_table[joint])
+            elif cmd == "effort":
+                eff_vals.append(val)
+                eff_dofs.append(dof_idx_table[joint])
+
         if valid:
             self._control_dofs_pos(pos_vals, pos_dofs)
             self._control_dofs_vel(vel_vals, vel_dofs)
-            self._control_dofs_pos(eff_vals, eff_dofs)
+            self._control_dofs_eff(eff_vals, eff_dofs)
 
     def setup_control_subscriber(self):
         """Initialize the joint trajectory (control) subscriber."""
@@ -200,6 +219,7 @@ class GsRosRobotControl:
             if self.scene.is_built and not self.dof_properties_set:
                 self.set_dofs_properties()
             for point in msg.points:
+                print(f"Setting: {point}")
                 self._trajectory_point_controller(
                     point, joint_properties, dof_idx_table
                 )
@@ -257,25 +277,41 @@ class GsRosRobotControl:
             vel_vals, vel_dofs = [], []
             eff_vals, eff_dofs = [], []
             for joint, joint_cfg in joint_properties.items():
-                if joint_cfg.get("command", "").lower() == "position":
-                    pos_vals.append(msg.position[pos_i])
-                    pos_dofs.append(dof_idx_table[joint])
+                cmd = joint_cfg.get("command", "").lower()
+
+                if cmd == "position":
+                    val = msg.position[pos_i]
                     pos_i += 1
-                elif joint_cfg.get("command", "").lower() == "velocity":
-                    vel_vals.append(msg.velocity[vel_i])
-                    vel_dofs.append(dof_idx_table[joint])
+                elif cmd == "velocity":
+                    val = msg.velocity[vel_i]
                     vel_i += 1
-                elif joint_cfg.get("command", "").lower() == "effort":
-                    eff_vals.append(msg.effort[eff_i])
-                    eff_dofs.append(dof_idx_table[joint])
+                elif cmd == "effort":
+                    val = msg.effort[eff_i]
                     eff_i += 1
                 else:
-                    print("Invalid joint command type")
+                    gs.logger.debug(f"Invalid joint command type for {joint} joint")
                     valid = False
+                    continue
+
+                # check for NaN or inf
+                if not math.isfinite(val):
+                    gs.logger.debug(f"Invalid value (NaN/inf) for joint {joint}: {val}")
+                    valid = False
+                    continue
+
+                if cmd == "position":
+                    pos_vals.append(val)
+                    pos_dofs.append(dof_idx_table[joint])
+                elif cmd == "velocity":
+                    vel_vals.append(val)
+                    vel_dofs.append(dof_idx_table[joint])
+                elif cmd == "effort":
+                    eff_vals.append(val)
+                    eff_dofs.append(dof_idx_table[joint])
             if valid:
                 self._control_dofs_pos(pos_vals, pos_dofs)
                 self._control_dofs_vel(vel_vals, vel_dofs)
-                self._control_dofs_pos(eff_vals, eff_dofs)
+                self._control_dofs_eff(eff_vals, eff_dofs)
 
         joint_commands_subscriber = self.ros_node.create_subscription(
             JointState,
