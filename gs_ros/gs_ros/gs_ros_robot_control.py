@@ -32,6 +32,12 @@ class GsRosRobotControl:
         self.joint_names = [joint.name for joint in self.robot.joints]
         self.motor_dofs = get_dofs_idx(self.robot, joint_names=self.joint_names)
 
+        # create joint-name to control type dict
+        self.joint_to_command = {}
+        joint_properties = dict(sorted(self.robot_config.get("joint_properties", None).items()))
+        for joint, joint_cfg in joint_properties.items():
+            self.joint_to_command[joint] = joint_cfg.get("command", "").lower()
+
         self.register_robot_options()
 
         self.dof_properties_set = False
@@ -159,15 +165,15 @@ class GsRosRobotControl:
             lambda: timer_callback(self.joint_state_publisher),
         )
 
-    def _trajectory_point_controller(self, point, joint_properties, dof_idx_table):
+    def _trajectory_point_controller(self, point, joint_names, dof_idx_table):
         valid = True
         pos_i, vel_i, eff_i = 0, 0, 0
         pos_vals, pos_dofs = [], []
         vel_vals, vel_dofs = [], []
         eff_vals, eff_dofs = [], []
 
-        for joint, joint_cfg in joint_properties.items():
-            cmd = joint_cfg.get("command", "").lower()
+        for joint_name in joint_names:
+            cmd = self.joint_to_command[joint_name]
 
             if cmd == "position":
                 val = point.position[pos_i]
@@ -179,25 +185,25 @@ class GsRosRobotControl:
                 val = point.effort[eff_i]
                 eff_i += 1
             else:
-                gs.logger.debug(f"Invalid joint command type for {joint} joint")
+                gs.logger.debug(f"Invalid joint command type for {joint_name} joint")
                 valid = False
                 continue
 
             # check for NaN or inf
             if not math.isfinite(val):
-                gs.logger.debug(f"Invalid value (NaN/inf) for joint {joint}: {val}")
+                gs.logger.debug(f"Invalid value (NaN/inf) for joint {joint_name}: {val}")
                 valid = False
                 continue
 
             if cmd == "position":
                 pos_vals.append(val)
-                pos_dofs.append(dof_idx_table[joint])
+                pos_dofs.append(dof_idx_table[joint_name])
             elif cmd == "velocity":
                 vel_vals.append(val)
-                vel_dofs.append(dof_idx_table[joint])
+                vel_dofs.append(dof_idx_table[joint_name])
             elif cmd == "effort":
                 eff_vals.append(val)
-                eff_dofs.append(dof_idx_table[joint])
+                eff_dofs.append(dof_idx_table[joint_name])
 
         if valid:
             self._control_dofs_pos(pos_vals, pos_dofs)
@@ -220,9 +226,7 @@ class GsRosRobotControl:
                 self.set_dofs_properties()
             for point in msg.points:
                 print(f"Setting: {point}")
-                self._trajectory_point_controller(
-                    point, joint_properties, dof_idx_table
-                )
+                self._trajectory_point_controller(point, msg.joint_names, dof_idx_table)
 
         control_topic = self.robot_config.get(
             "joint_control_topic",
@@ -269,15 +273,12 @@ class GsRosRobotControl:
                 dof_idx_table[msg.name[k]] = motor_dof
 
             valid = True
-            joint_properties = dict(
-                sorted(self.robot_config.get("joint_properties", None).items())
-            )
             pos_i, vel_i, eff_i = 0, 0, 0
             pos_vals, pos_dofs = [], []
             vel_vals, vel_dofs = [], []
             eff_vals, eff_dofs = [], []
-            for joint, joint_cfg in joint_properties.items():
-                cmd = joint_cfg.get("command", "").lower()
+            for joint_name in msg.name:
+                cmd = self.joint_to_command[joint_name]
 
                 if cmd == "position":
                     val = msg.position[pos_i]
@@ -289,25 +290,25 @@ class GsRosRobotControl:
                     val = msg.effort[eff_i]
                     eff_i += 1
                 else:
-                    gs.logger.debug(f"Invalid joint command type for {joint} joint")
+                    gs.logger.debug(f"Invalid joint command type for {joint_name} joint")
                     valid = False
                     continue
 
                 # check for NaN or inf
                 if not math.isfinite(val):
-                    gs.logger.debug(f"Invalid value (NaN/inf) for joint {joint}: {val}")
+                    gs.logger.debug(f"Invalid value (NaN/inf) for joint {joint_name}: {val}")
                     valid = False
                     continue
 
                 if cmd == "position":
                     pos_vals.append(val)
-                    pos_dofs.append(dof_idx_table[joint])
+                    pos_dofs.append(dof_idx_table[joint_name])
                 elif cmd == "velocity":
                     vel_vals.append(val)
-                    vel_dofs.append(dof_idx_table[joint])
+                    vel_dofs.append(dof_idx_table[joint_name])
                 elif cmd == "effort":
                     eff_vals.append(val)
-                    eff_dofs.append(dof_idx_table[joint])
+                    eff_dofs.append(dof_idx_table[joint_name])
             if valid:
                 self._control_dofs_pos(pos_vals, pos_dofs)
                 self._control_dofs_vel(vel_vals, vel_dofs)
