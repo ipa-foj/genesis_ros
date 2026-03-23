@@ -90,9 +90,10 @@ def get_dofs_idx(robot, joint_names):
         for joint_name in joint_names:
             if joint_name == "root_joint":
                 continue
-            for joint in robot.joints:
-                if joint.name == joint_name:
-                    motor_dofs.append(joint.dofs_idx_local[0])
+            # for joint in robot.joints:
+            #     if joint.name == joint_name:
+            #         motor_dofs.append(joint.dofs_idx_local[0])
+            motor_dofs.append(robot.get_joint(joint_name).dofs_idx_local[0])
         return motor_dofs
 
 
@@ -650,7 +651,6 @@ def make_morph(morph_config):
             scale=morph_config.get("scale", 1.0),
             convexify=morph_config.get("convexify", None),
             recompute_inertia=morph_config.get("recompute_inertia", False),
-            parse_glb_with_trimesh=morph_config.get("parse_glb_with_trimesh", False),
             fixed=morph_config.get("fixed", False),
             group_by_material=morph_config.get("group_by_material", True),
             merge_submeshes_for_collision=morph_config.get(
