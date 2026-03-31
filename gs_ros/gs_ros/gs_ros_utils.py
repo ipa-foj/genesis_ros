@@ -2,6 +2,12 @@ import genesis as gs
 import numpy as np
 from builtin_interfaces.msg import Time
 
+import os
+import tempfile
+import xacro
+from xml.etree import ElementTree as ET
+from ament_index_python.packages import get_package_share_directory
+
 from rclpy.qos import (
     QoSProfile,
     QoSHistoryPolicy,
@@ -562,6 +568,32 @@ def calculate_bounds(morph_type, morph):
         ]
 
 
+def resolve_package_uri(uri: str) -> str:
+    if not uri.startswith("package://"):
+        return uri  # already absolute or relative
+
+    # strip scheme
+    path = uri[len("package://"):]
+
+    # split into package name and relative path
+    pkg_name, rel_path = path.split("/", 1)
+
+    pkg_share = get_package_share_directory(pkg_name)
+    return os.path.join(pkg_share, rel_path)
+
+def resolve_package_references(xacro_xml: str) -> str:
+    # parse xml to navigate through
+    root = ET.fromstring(xacro_xml)
+
+    # resolve package references for meshes
+    for mesh in root.iter("mesh"):
+        filename = mesh.get("filename")
+        if filename:
+            mesh.set("filename", resolve_package_uri(filename))
+
+    urdf_with_abs = ET.tostring(root, encoding="unicode")
+    return urdf_with_abs
+
 def make_morph(morph_config):
     """Create a Genesis Morph object (URDF, MJCF, Mesh, etc.) from a configuration dictionary."""
     if morph_config is None:
@@ -626,6 +658,41 @@ def make_morph(morph_config):
             merge_fixed_links=morph_config.get("merge_fixed_links", True),
             links_to_keep=morph_config.get("links_to_keep", []),
         )
+    elif morph_type == "XACRO" or entity_path.lower().endswith(".xacro"):
+        # parse xacro
+        with open(entity_path, 'r') as f:
+            doc = xacro.parse(f)
+        xacro.process_doc(doc)
+        parsed_urdf_xml = doc.toxml()
+        
+        # resolve package references
+        parsed_urdf_xml = resolve_package_references(parsed_urdf_xml)
+        
+        # write file to temporary directory
+        temp_dir = tempfile.TemporaryDirectory()
+        urdf_file = os.path.join(temp_dir.name, 'morph.urdf')
+        with open(urdf_file, 'w') as f:
+            f.write(parsed_urdf_xml)
+
+        # create morph from resolved URDF
+        morph = gs.morphs.URDF(
+            file=urdf_file,
+            pos=morph_config.get("pos", (0.0, 0.0, 0.0)),
+            euler=morph_config.get("euler", (0.0, 0.0, 0.0)),
+            quat=morph_config.get("quat", None),
+            visualization=morph_config.get("visualization", True),
+            collision=morph_config.get("collision", True),
+            requires_jac_and_IK=morph_config.get("requires_jac_and_IK", True),
+            scale=morph_config.get("scale", 1.0),
+            convexify=morph_config.get("convexify", None),
+            recompute_inertia=morph_config.get("recompute_inertia", False),
+            fixed=morph_config.get("fixed", False),
+            prioritize_urdf_material=morph_config.get("prioritize_urdf_material", False),
+            merge_fixed_links=morph_config.get("merge_fixed_links", True),
+            links_to_keep=morph_config.get("links_to_keep", []),
+        )
+        morph._temp_dir = temp_dir # keep temporary dir alive until morph is created or deleted -> removed after sim shut down
+        return morph
     elif morph_type == "MJCF" or entity_path.lower().endswith(".xml"):
         return gs.morphs.MJCF(
             file=entity_path,
