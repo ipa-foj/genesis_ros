@@ -433,9 +433,7 @@ def make_coupler_options(coupler_config):
         coupler_options = gs.options.SAPCouplerOptions(
             n_sap_iterations=sap_coupler_config.get("n_sap_iterations", 5),
             n_pcg_iterations=sap_coupler_config.get("n_pcg_iterations", 100),
-            n_linesearch_iterations=sap_coupler_config.get(
-                "n_linesearch_iterations", 10
-            ),
+            n_linesearch_iterations=sap_coupler_config.get("n_linesearch_iterations", 10),
             sap_convergence_atol=sap_coupler_config.get("sap_convergence_atol", 1e-6),
             sap_convergence_rtol=sap_coupler_config.get("sap_convergence_rtol", 1e-5),
             sap_taud=sap_coupler_config.get("sap_taud", 0.1),
@@ -443,17 +441,45 @@ def make_coupler_options(coupler_config):
             sap_sigma=sap_coupler_config.get("sap_sigma", 1e-3),
             pcg_threshold=sap_coupler_config.get("pcg_threshold", 1e-6),
             linesearch_ftol=sap_coupler_config.get("linesearch_ftol", 1e-6),
-            linesearch_max_step_size=sap_coupler_config.get(
-                "linesearch_max_step_size", 1.5
-            ),
-            hydroelastic_stiffness=sap_coupler_config.get(
-                "hydroelastic_stiffness", 1e8
-            ),
-            point_contact_stiffness=sap_coupler_config.get(
-                "point_contact_stiffness", 1e8
-            ),
+            linesearch_max_step_size=sap_coupler_config.get("linesearch_max_step_size", 1.5),
+            hydroelastic_stiffness=sap_coupler_config.get("hydroelastic_stiffness", 1e8),
+            point_contact_stiffness=sap_coupler_config.get("point_contact_stiffness", 1e8),
             fem_floor_type=sap_coupler_config.get("fem_floor_type", "tet"),
             fem_self_tet=sap_coupler_config.get("fem_self_tet", True),
+        )
+        return coupler_options
+    elif coupler_config["type"] == "IPC":
+        ipc_coupler_config = coupler_config["ipc"]
+        coupler_options = gs.options.IPCCouplerOptions(
+            newton_max_iterations=ipc_coupler_config.get("newton_max_iterations", None),
+            newton_min_iterations=ipc_coupler_config.get("newton_min_iterations", None),
+            newton_tolerance=ipc_coupler_config.get("newton_tolerance", None),
+            newton_ccd_tolerance=ipc_coupler_config.get("newton_ccd_tolerance", None),
+            newton_use_adaptive_tolerance=ipc_coupler_config.get("newton_use_adaptive_tolerance", None),
+            newton_translation_tolerance=ipc_coupler_config.get("newton_translation_tolerance", None),
+            newton_semi_implicit_enable=ipc_coupler_config.get("newton_semi_implicit_enable", None),
+            newton_semi_implicit_beta_tolerance=ipc_coupler_config.get("newton_semi_implicit_beta_tolerance", None),
+            n_linesearch_iterations=ipc_coupler_config.get("n_linesearch_iterations", None),
+            linesearch_report_energy=ipc_coupler_config.get("linesearch_report_energy", None),
+            linear_system_solver=ipc_coupler_config.get("linear_system_solver", None),
+            linear_system_tolerance=ipc_coupler_config.get("linear_system_tolerance", None),
+            contact_enable=ipc_coupler_config.get("contact_enable", None),
+            contact_d_hat=ipc_coupler_config.get("contact_d_hat", None),
+            contact_friction_enable=ipc_coupler_config.get("contact_friction_enable", None),
+            contact_resistance=ipc_coupler_config.get("contact_resistance", 1e9),
+            contact_eps_velocity=ipc_coupler_config.get("contact_eps_velocity", None),
+            contact_constitution=ipc_coupler_config.get("contact_constitution", None),
+            collision_detection_method=ipc_coupler_config.get("collision_detection_method", None),
+            cfl_enable=ipc_coupler_config.get("cfl_enable", None),
+            sanity_check_enable=ipc_coupler_config.get("sanity_check_enable", None),
+            constraint_strength_translation=ipc_coupler_config.get("constraint_strength_translation", 100.0),
+            constraint_strength_rotation=ipc_coupler_config.get("constraint_strength_rotation", 100.0),
+            enable_rigid_ground_contact=ipc_coupler_config.get("enable_rigid_ground_contact", True),
+            enable_rigid_rigid_contact=ipc_coupler_config.get("enable_rigid_rigid_contact", True),
+            two_way_coupling=ipc_coupler_config.get("two_way_coupling", True),
+            enable_rigid_dofs_sync=ipc_coupler_config.get("enable_rigid_dofs_sync", False),
+            free_base_driven_by_ipc=ipc_coupler_config.get("free_base_driven_by_ipc", False),
+            _show_ipc_gui=ipc_coupler_config.get("_show_ipc_gui", False),
         )
         return coupler_options
     else:
@@ -797,6 +823,10 @@ def make_material(material_config):
             rho=material_config.get("rho", 200.0),
             friction=material_config.get("friction", None),
             needs_coup=material_config.get("needs_coup", True),
+            enable_coup_collision=material_config.get("enable_coup_collision", True),
+            coup_type=material_config.get("coup_type", None),
+            coup_links=material_config.get("coup_links", None),
+            contact_resistance=material_config.get("contact_resistance", None),
             coup_friction=material_config.get("coup_friction", 0.1),
             coup_softness=material_config.get("coup_softness", 0.002),
             coup_restitution=material_config.get("coup_restitution", 0.0),
@@ -829,6 +859,32 @@ def make_material(material_config):
             func_instantiate_soft_from_rigid=None,
             func_instantiate_rigid_soft_association=None,
         )
+    elif material_config["type"].lower() == "sph_fluid":
+        material = gs.materials.SPH.Liquid(
+            rho=material_config.get("rho", 1000.0),
+            stiffness=material_config.get("stiffness", 50000.0),
+            exponent=material_config.get("exponent", 7.0),
+            mu=material_config.get("mu", 0.005),
+            gamma=material_config.get("gamma", 0.01),
+            sampler=material_config.get("sampler", "regular")
+        )
+    elif material_config["type"].lower() == "mpm_fluid":
+        material = gs.materials.MPM.Liquid(
+            E=material_config.get("E", 1e6),
+            nu=material_config.get("nu", 0.2),
+            rho=material_config.get("rho", 1000.0),
+            viscous=material_config.get("viscous", False)
+        )
+    elif material_config["type"].lower() == "mpm_sand":
+        material = gs.materials.MPM.Sand(
+            E=material_config.get("E", 1e6),
+            nu=material_config.get("nu", 0.2),
+            rho=material_config.get("rho", 1000.0),
+            friction_angle=material_config.get("friction_angle", 45.0),
+            sampler=material_config.get("sampler", "random")
+        )
+    else:
+        gs.logger.error(f"Unrecognized type: {material_config["type"].lower()}")
     return material
 
 

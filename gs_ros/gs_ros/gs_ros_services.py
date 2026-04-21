@@ -359,7 +359,7 @@ class GsRosServices:
                 len(request.entity_one) <= 0
                 or len(request.entity_one) <= 0
                 or len(request.link_one) <= 0
-                or len(request.link_one) <= 0
+                or len(request.link_two) <= 0
             ):
                 response.success = False
                 response.message = (
